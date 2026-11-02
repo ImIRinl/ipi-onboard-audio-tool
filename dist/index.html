@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>IPI 板载音频工具</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">IPI</span><span>板载音频实验工具</span></div>
+    <div class="connection"><span id="status-dot" class="dot"></span><span id="connection-label">未连接</span></div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">VID 372E · PID 10F8 / 10F9</p>
+        <h1>读取、备份并替换鼠标提示音</h1>
+        <p class="intro">本工具直接使用官方网页驱动采用的 WebHID 指令。不会自动写入设备；请先备份，再上传。</p>
+      </div>
+      <button id="connect" class="primary">连接 IPI 鼠标</button>
+    </section>
+
+    <div id="compat-warning" class="notice warning hidden">
+      当前浏览器不支持 WebHID。请通过本地地址在桌面版 Chrome 或 Edge 中打开。
+    </div>
+    <div class="notice info">
+      <strong>开始前：</strong>关闭官方网页驱动的设备页面，避免两个页面同时占用 HID 接口。无线型号请保持接收器连接稳定。
+    </div>
+
+    <section class="grid dashboard">
+      <article class="card device-card">
+        <div class="card-head"><div><p class="step">01</p><h2>设备状态</h2></div><button id="refresh" class="quiet" disabled>重新读取</button></div>
+        <dl class="facts">
+          <div><dt>产品</dt><dd id="product">—</dd></div>
+          <div><dt>协议 UUID</dt><dd id="uuid">—</dd></div>
+          <div><dt>协议版本</dt><dd id="protocol-version">—</dd></div>
+          <div><dt>包长度</dt><dd id="package-size">—</dd></div>
+        </dl>
+        <div class="capacity">
+          <div class="capacity-line"><span>板载空间</span><span id="capacity-label">—</span></div>
+          <div class="meter"><span id="capacity-meter"></span></div>
+        </div>
+      </article>
+
+      <article class="card settings-card">
+        <div class="card-head"><div><p class="step">02</p><h2>播放设置</h2></div></div>
+        <label class="field"><span>板载音量 <output id="volume-value">—</output></span><input id="volume" type="range" min="0" max="8" value="0" disabled></label>
+        <div class="binding-row">
+          <div>
+            <span>当前提示音</span><strong id="left-binding">—</strong>
+            <label class="field"><span class="sr-only">选择提示音</span><select id="left-audio" disabled><option value="255">关闭提示音</option></select></label>
+            <button id="apply-left" class="secondary" disabled>启用此音效</button>
+          </div>
+        </div>
+        <p class="muted">原厂 v1.2.2 实际播放使用左键绑定，两键可能播放同一音效。本版只提供单一提示音选择，不支持左右键独立音效，不修改固件。</p>
+      </article>
+    </section>
+
+    <section class="card library-card">
+      <div class="card-head">
+        <div><p class="step">03</p><h2>板载音效槽位</h2><p class="muted" id="library-summary">连接后读取每个槽位及启用状态</p></div>
+        <button id="backup" class="secondary" disabled>备份全部音频</button>
+      </div>
+      <div id="library" class="library empty"><p>暂无设备数据</p></div>
+    </section>
+
+    <section class="card upload-card">
+      <div class="card-head"><div><p class="step">04</p><h2>自定义上传</h2></div><span class="safe-badge">手动写入</span></div>
+      <div class="upload-grid">
+        <div>
+          <label id="drop-zone" class="drop-zone">
+            <input id="audio-file" type="file" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a" disabled>
+            <span class="drop-icon">＋</span>
+            <strong>选择音频文件</strong>
+            <small>将在浏览器内转换为 8 kHz / 8-bit / 单声道 PCM WAV</small>
+          </label>
+          <audio id="preview" controls class="hidden"></audio>
+        </div>
+        <div class="form-stack">
+          <label class="field"><span>板载名称（最多 15 个 UTF-8 字节）</span><input id="audio-name" maxlength="15" placeholder="例如：自定义1" disabled></label>
+          <label class="field"><span>写入槽位</span><select id="slot" disabled><option>连接后可选</option></select></label>
+          <div id="conversion" class="conversion">尚未选择音频</div>
+          <p class="muted">上传只保存音频；随后在“板载音效槽位”中启用所需音效。</p>
+          <label id="overwrite-row" class="overwrite hidden"><input id="allow-overwrite" type="checkbox"> 我确认覆盖该槽位的现有音频</label>
+          <button id="upload" class="primary" disabled>写入板载存储</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card log-card">
+      <div class="card-head"><div><p class="step">日志</p><h2>操作记录</h2></div><button id="clear-log" class="quiet">清空</button></div>
+      <pre id="log" aria-live="polite">等待连接…</pre>
+    </section>
+  </main>
+
+  <footer>v1.2.0 · 本地音频上传版 · 不刷固件 · 不上传音频到任何服务器 · 写入前请保留备份</footer>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

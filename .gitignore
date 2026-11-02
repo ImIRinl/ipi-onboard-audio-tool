@@ -1,0 +1,12 @@
+node_modules/
+*.log
+*.zip
+*.exe
+*.bin
+*.pem
+*.wav
+*backup*.json
+.env*
+.DS_Store
+analysis/
+live-readonly/
