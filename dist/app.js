@@ -5,18 +5,23 @@ import { recoverAudioDirectory } from "./directory.js";
 const $ = (selector) => document.querySelector(selector);
 const ui = {
   connect: $("#connect"), refresh: $("#refresh"), backup: $("#backup"), upload: $("#upload"), file: $("#audio-file"),
-  name: $("#audio-name"), slot: $("#slot"), leftAudio: $("#left-audio"), applyLeft: $("#apply-left"),
+  name: $("#audio-name"), slot: $("#slot"), leftAudio: $("#left-audio"), rightAudio: $("#right-audio"), applyLeft: $("#apply-left"), applyRight: $("#apply-right"), firmwareConfirmed: $("#confirm-separated-firmware"),
   overwrite: $("#allow-overwrite"), overwriteRow: $("#overwrite-row"), volume: $("#volume"), volumeValue: $("#volume-value"),
   log: $("#log"), library: $("#library"), summary: $("#library-summary"), preview: $("#preview"), conversion: $("#conversion"),
   statusDot: $("#status-dot"), connectionLabel: $("#connection-label"), product: $("#product"), uuid: $("#uuid"),
   protocolVersion: $("#protocol-version"), packageSize: $("#package-size"), capacityLabel: $("#capacity-label"),
-  capacityMeter: $("#capacity-meter"), leftBinding: $("#left-binding")
+  capacityMeter: $("#capacity-meter"), leftBinding: $("#left-binding"), rightBinding: $("#right-binding")
 };
 
-const state = { device: null, directory: null, converted: null, previewUrl: null, leftIndex: 0xff, rightIndex: 0xff, busy: false };
+const state = { device: null, connected: false, directory: null, converted: null, previewUrl: null, leftIndex: 0xff, rightIndex: 0xff, busy: false };
 
 const formatBytes = (bytes) => bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
 const time = () => new Date().toLocaleTimeString("zh-CN", { hour12: false });
+function updateBindingControls() {
+  const disabled = state.busy || !state.connected || !state.device || !ui.firmwareConfirmed.checked;
+  for (const element of [ui.leftAudio, ui.rightAudio, ui.applyLeft, ui.applyRight]) element.disabled = disabled;
+  for (const button of ui.library.querySelectorAll('[data-action="binding"]')) button.disabled = disabled;
+}
 function log(message, type = "info") {
   const prefix = type === "error" ? "错误" : type === "ok" ? "完成" : "信息";
   ui.log.textContent += `\n[${time()}] ${prefix} · ${message}`;
@@ -30,13 +35,16 @@ function setBusy(busy) {
   for (const element of [ui.file, ui.name, ui.slot, ui.volume, ui.leftAudio, ui.applyLeft]) element.disabled = busy || !state.device;
   for (const button of ui.library.querySelectorAll("button")) button.disabled = busy || !state.device;
   updateUploadButton();
+  updateBindingControls();
 }
 function setConnected(connected) {
+  state.connected = connected;
   ui.statusDot.classList.toggle("online", connected);
   ui.connectionLabel.textContent = connected ? "设备已连接" : "未连接";
   ui.connect.textContent = connected ? "重新选择设备" : "连接 IPI 鼠标";
   for (const element of [ui.refresh, ui.backup, ui.file, ui.name, ui.slot, ui.leftAudio, ui.applyLeft, ui.volume]) element.disabled = !connected;
   for (const button of ui.library.querySelectorAll("button")) button.disabled = !connected;
+  updateBindingControls();
 }
 function utf8Length(value) { return new TextEncoder().encode(value).length; }
 function findFile(index) { return state.directory?.files.find((file) => file.index === Number(index)); }
@@ -61,8 +69,9 @@ function renderDirectory() {
   ui.volume.value = Math.min(8, directory.volume);
   ui.volumeValue.textContent = String(directory.volume);
   ui.leftBinding.textContent = fileName(state.leftIndex);
+  ui.rightBinding.textContent = fileName(state.rightIndex);
 
-  for (const [select, current] of [[ui.leftAudio, state.leftIndex]]) {
+  for (const [select, current] of [[ui.leftAudio, state.leftIndex], [ui.rightAudio, state.rightIndex]]) {
     select.replaceChildren(new Option("关闭提示音", "255"));
     for (const file of directory.files) select.add(new Option(`槽位 ${file.index} · ${file.name}`, String(file.index)));
     if (current !== 255 && !findFile(current)) select.add(new Option(`槽位 ${current} · 内容不可用`, String(current)));
@@ -87,14 +96,14 @@ function renderDirectory() {
       const button = document.createElement("button"); button.className = "quiet"; button.textContent = "从板载读取并试听";
       button.addEventListener("click", () => previewBoardAudio(file));
       const badges = document.createElement("div"); badges.className = "tone-state";
-      for (const [key, current] of [["提示音", state.leftIndex]]) {
+      for (const [key, current] of [["左键", state.leftIndex], ["右键", state.rightIndex]]) {
         if (current !== file.index) continue;
-        const badge = document.createElement("span"); badge.textContent = `${key}已启用`; badges.append(badge); card.classList.add("active");
+        const badge = document.createElement("span"); badge.textContent = `${key}已绑定`; badges.append(badge); card.classList.add("active");
       }
       if (!badges.childElementCount) { const idle = document.createElement("span"); idle.className = "idle"; idle.textContent = "已保存 · 未启用"; badges.append(idle); }
       const actions = document.createElement("div"); actions.className = "tone-actions";
-      for (const [key, side] of [["提示音", "left"]]) {
-        const enable = document.createElement("button"); enable.className = "secondary"; enable.textContent = "启用此音效";
+      for (const [key, side] of [["左键", "left"], ["右键", "right"]]) {
+        const enable = document.createElement("button"); enable.className = "secondary"; enable.textContent = `应用到${key}`; enable.dataset.action = "binding";
         enable.addEventListener("click", () => applyBinding(side, file.index)); actions.append(enable);
       }
       top.append(name, index); card.append(top, meta, badges, button, actions); ui.library.append(card);
@@ -112,6 +121,7 @@ function renderDirectory() {
   const firstFree = Array.from({ length: directory.fileLimit }, (_, index) => index).find((index) => !findFile(index));
   ui.slot.value = String(Number.isInteger(previous) && previous < directory.fileLimit ? previous : (firstFree ?? 0));
   updateOverwriteState();
+  updateBindingControls();
 }
 
 async function refreshDevice() {
@@ -136,20 +146,19 @@ async function refreshDevice() {
 
 async function applyBinding(side, index) {
   if (state.busy || !state.device) return;
-  if (side !== "left") return;
-  const keyPos = 2;
-  const label = "提示音";
+  if (!ui.firmwareConfirmed.checked) { log("请先确认已安装兼容的修正版鼠标固件；网页不能修复原厂固件", "error"); return; }
+  if (!["left", "right"].includes(side)) return;
+  const keyPos = side === "left" ? 2 : 3;
+  const label = side === "left" ? "左键" : "右键";
   if (index !== 255 && !findFile(index)) { log("请选择已保存音频的槽位", "error"); return; }
   ui.preview.pause();
   setBusy(true);
   try {
-    await state.device.setAudioByKeyPos(keyPos, index);
-    const bindings = await state.device.getAudioBindings();
-    if (bindings.left !== index) throw new Error("提示音绑定回读不一致，请重新读取设备");
+    const bindings = await state.device.applyAudioBinding(keyPos, index);
     state.leftIndex = bindings.left;
     state.rightIndex = bindings.right;
     renderDirectory();
-    log(`${label}绑定已回读确认：${fileName(bindings.left)}。原厂 v1.2.2 不支持两键独立播放`, "ok");
+    log(`${label}绑定已双向回读确认：${fileName(bindings[side])}；另一侧未变。请分别按键验证鼠标音箱播放`, "ok");
   } catch (error) {
     log(error.message, "error");
     if (error.bindings) {
@@ -161,6 +170,7 @@ async function applyBinding(side, index) {
 }
 
 async function connect() {
+  ui.firmwareConfirmed.checked = false;
   setBusy(true);
   try {
     if (state.device) await state.device.close().catch(() => {});
@@ -280,7 +290,7 @@ async function upload() {
     if (readback.length !== bytes.length || !readback.every((value, offset) => value === bytes[offset])) throw new Error("回读内容与上传音频不一致，请保留备份并重新读取设备");
     log(`音频数据写入并回读验证完成：${name}`, "ok");
     await refreshDevice();
-    log("音效已保存，请在槽位卡片中选择启用此音效");
+    log("音效已保存；兼容修正版固件可在槽位卡片中分别应用到左键或右键");
   } catch (error) { log(error.message, "error"); }
   finally { setBusy(false); }
 }
@@ -294,6 +304,8 @@ ui.name.addEventListener("input", updateUploadButton);
 ui.overwrite.addEventListener("change", updateUploadButton);
 ui.upload.addEventListener("click", upload);
 ui.applyLeft.addEventListener("click", () => applyBinding("left", Number(ui.leftAudio.value)));
+ui.applyRight.addEventListener("click", () => applyBinding("right", Number(ui.rightAudio.value)));
+ui.firmwareConfirmed.addEventListener("change", updateBindingControls);
 ui.volume.addEventListener("input", () => { ui.volumeValue.textContent = ui.volume.value; });
 ui.volume.addEventListener("change", async () => {
   setBusy(true);
@@ -304,7 +316,8 @@ ui.volume.addEventListener("change", async () => {
 $("#clear-log").addEventListener("click", () => { ui.log.textContent = "日志已清空"; });
 
 if (!("hid" in navigator)) $("#compat-warning").classList.remove("hidden");
-log("v1.2.0 本地上传版已加载：不刷固件，不提供左右键独立播放");
+log("v1.3.0 已加载：左右键分别选音需兼容修正版固件；人工确认不代表自动检测，网页不刷固件");
+updateBindingControls();
 navigator.hid?.addEventListener("disconnect", (event) => {
   if (state.device?.device === event.device) { setConnected(false); state.device = null; log("设备已断开", "error"); }
 });

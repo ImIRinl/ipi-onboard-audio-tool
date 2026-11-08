@@ -48,14 +48,20 @@
       <article class="card settings-card">
         <div class="card-head"><div><p class="step">02</p><h2>播放设置</h2></div></div>
         <label class="field"><span>板载音量 <output id="volume-value">—</output></span><input id="volume" type="range" min="0" max="8" value="0" disabled></label>
+        <label class="overwrite"><input id="confirm-separated-firmware" type="checkbox"> 我确认已安装支持左右键独立选音的修正版鼠标固件</label>
         <div class="binding-row">
           <div>
-            <span>当前提示音</span><strong id="left-binding">—</strong>
-            <label class="field"><span class="sr-only">选择提示音</span><select id="left-audio" disabled><option value="255">关闭提示音</option></select></label>
-            <button id="apply-left" class="secondary" disabled>启用此音效</button>
+            <span>左键当前绑定</span><strong id="left-binding">—</strong>
+            <label class="field"><span class="sr-only">选择左键音效</span><select id="left-audio" disabled><option value="255">关闭提示音</option></select></label>
+            <button id="apply-left" class="secondary" disabled>应用到左键</button>
+          </div>
+          <div>
+            <span>右键当前绑定</span><strong id="right-binding">—</strong>
+            <label class="field"><span class="sr-only">选择右键音效</span><select id="right-audio" disabled><option value="255">关闭提示音</option></select></label>
+            <button id="apply-right" class="secondary" disabled>应用到右键</button>
           </div>
         </div>
-        <p class="muted">原厂 v1.2.2 实际播放使用左键绑定，两键可能播放同一音效。本版只提供单一提示音选择，不支持左右键独立音效，不修改固件。</p>
+        <p class="muted">左右键独立播放需要修正版鼠标固件。原厂 v1.2.2 不支持；修正版也可能仍显示 1.2.2，网页无法仅凭版本号识别。上方勾选只是人工确认，不是固件检测。网页不提供刷写、固件下载或自动修复，不支持同时混音。</p>
       </article>
     </section>
 
@@ -83,7 +89,7 @@
           <label class="field"><span>板载名称（最多 15 个 UTF-8 字节）</span><input id="audio-name" maxlength="15" placeholder="例如：自定义1" disabled></label>
           <label class="field"><span>写入槽位</span><select id="slot" disabled><option>连接后可选</option></select></label>
           <div id="conversion" class="conversion">尚未选择音频</div>
-          <p class="muted">上传只保存音频；随后在“板载音效槽位”中启用所需音效。</p>
+          <p class="muted">上传只保存音频；确认已安装修正版固件后，再分别应用到左键或右键。</p>
           <label id="overwrite-row" class="overwrite hidden"><input id="allow-overwrite" type="checkbox"> 我确认覆盖该槽位的现有音频</label>
           <button id="upload" class="primary" disabled>写入板载存储</button>
         </div>
@@ -96,7 +102,7 @@
     </section>
   </main>
 
-  <footer>v1.2.0 · 本地音频上传版 · 不刷固件 · 不上传音频到任何服务器 · 写入前请保留备份</footer>
+  <footer>v1.3.0 · 左右键分别选音版 · 需兼容修正版固件 · 不刷固件 · 不上传音频到服务器</footer>
   <script type="module" src="./app.js"></script>
 </body>
 </html>
